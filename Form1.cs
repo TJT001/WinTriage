@@ -187,18 +187,43 @@ namespace WinTriage
             _bgWorker.RunWorkerCompleted += BgWorker_RunWorkerCompleted;
         }
 
+        private void pnlHeader_Paint(object sender, System.Windows.Forms.PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            var rect = new System.Drawing.Rectangle(0, 0, pnlHeader.Width, pnlHeader.Height);
+            // 深色渐变 Header 背景
+            using (var br = new System.Drawing.Drawing2D.LinearGradientBrush(
+                rect,
+                System.Drawing.Color.FromArgb(28, 32, 50),
+                System.Drawing.Color.FromArgb(18, 21, 35),
+                System.Drawing.Drawing2D.LinearGradientMode.Vertical))
+            {
+                g.FillRectangle(br, rect);
+            }
+            // 底部左侧蓝色细线
+            using (var pen = new System.Drawing.Pen(Theme.AccentBlue, 2))
+                g.DrawLine(pen, 0, pnlHeader.Height - 1, pnlHeader.Width, pnlHeader.Height - 1);
+        }
+
         private void Form1_Load(object sender, EventArgs e)
         {
-            AppendLog("WinTriage 应急响应信息采集工具 已就绪。", Color.Silver);
-            AppendLog($"输出目录: {_outputDir}", Color.Silver);
+            AppendLog("WinTriage 应急响应信息采集工具 已就绪。", Theme.TextMuted);
+            AppendLog($"输出目录: {_outputDir}", Theme.TextMuted);
 
             // Warn if not running as Administrator (required for EventLog, Prefetch, Tasks, etc.)
             bool isAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent())
                 .IsInRole(WindowsBuiltInRole.Administrator);
-            if (!isAdmin)
+            if (isAdmin)
             {
-                AppendLog("⚠ 未以管理员身份运行！部分采集项（系统日志/Prefetch/计划任务XML等）可能为空。", Color.Gold);
-                AppendLog("  请右键 → 以管理员身份运行 以获取完整采集数据。", Color.Gold);
+                lblAdminBadge.ForeColor = Theme.AccentGreen;
+                lblAdminBadge.Text = "🛡 管理员";
+            }
+            else
+            {
+                lblAdminBadge.ForeColor = Theme.AccentOrange;
+                lblAdminBadge.Text = "⚠ 普通用户";
+                AppendLog("⚠ 未以管理员身份运行！部分采集项（系统日志/Prefetch/计划任务XML等）可能为空。", Theme.AccentOrange);
+                AppendLog("  请右键 → 以管理员身份运行 以获取完整采集数据。", Theme.AccentOrange);
             }
         }
 
@@ -209,7 +234,7 @@ namespace WinTriage
             var checkedItems = GetAllCheckedItems();
             if (checkedItems.Count == 0)
             {
-                AppendLog("[警告] 未选中任何采集项。", Color.Gold);
+                AppendLog($"[警告] 未选中任何采集项。", Theme.AccentOrange);
                 return;
             }
 
@@ -230,8 +255,8 @@ namespace WinTriage
             toolStripStatusLabel2.Text = $"输出: {_outputDir}";
             SetRunningState(true);
 
-            AppendLog($"开始采集 {checkedItems.Count} 项内容...", Color.Cyan);
-            AppendLog($"输出目录: {_outputDir}", Color.Cyan);
+            AppendLog($"开始采集 {checkedItems.Count} 项内容...", Theme.AccentBlue);
+            AppendLog($"输出目录: {_outputDir}", Theme.AccentBlue);
 
             _bgWorker.RunWorkerAsync(checkedItems);
         }
@@ -241,7 +266,7 @@ namespace WinTriage
             if (_bgWorker.IsBusy)
             {
                 _bgWorker.CancelAsync();
-                AppendLog("正在停止采集...", Color.Gold);
+                AppendLog("正在停止采集...", Theme.AccentOrange);
             }
         }
 
@@ -335,14 +360,14 @@ namespace WinTriage
             switch (info.Status)
             {
                 case "running":
-                    AppendLog($"{info.ItemName}：采集中...", Color.White);
+                    AppendLog($"{info.ItemName}：采集中...", Theme.TextPrimary);
                     break;
                 case "done":
                     lblProgress.Text = $"{info.Completed}/{info.Total}";
-                    AppendLog($"{info.ItemName}：已导出", Color.Lime);
+                    AppendLog($"{info.ItemName}：已导出", Theme.AccentGreen);
                     break;
                 case "failed":
-                    AppendLog($"{info.ItemName}：导出失败", Color.Red);
+                    AppendLog($"{info.ItemName}：导出失败", Theme.AccentRed);
                     break;
             }
         }
@@ -351,26 +376,26 @@ namespace WinTriage
         {
             if (e.Cancelled)
             {
-                AppendLog("--- 采集已取消 ---", Color.Gold);
+                AppendLog("--- 采集已取消 ---", Theme.AccentOrange);
                 toolStripStatusLabel1.Text = "⚠ 已取消";
                 WriteAuditLog("采集已取消");
             }
             else if (e.Error != null)
             {
-                AppendLog($"--- 采集出错: {e.Error.Message} ---", Color.Red);
+                AppendLog($"--- 采集出错: {e.Error.Message} ---", Theme.AccentRed);
                 toolStripStatusLabel1.Text = "❌ 出错";
                 WriteAuditLog($"采集出错: {e.Error.Message}");
             }
             else
             {
-                AppendLog("--- 采集完成，正在计算哈希... ---", Color.Cyan);
+                AppendLog("--- 采集完成，正在计算哈希... ---", Theme.AccentBlue);
                 toolStripStatusLabel1.Text = "🔒 计算哈希中...";
 
                 // Generate SHA256 hash manifest
                 GenerateHashManifest();
 
-                AppendLog("--- 哈希清单已生成 (hash_list.txt) ---", Color.Lime);
-                AppendLog("--- 采集完成！ ---", Color.Lime);
+                AppendLog("--- 哈希清单已生成 (hash_list.txt) ---", Theme.AccentGreen);
+                AppendLog("--- 采集完成！ ---", Theme.AccentGreen);
                 toolStripStatusLabel1.Text = "✅ 完成";
                 WriteAuditLog($"采集完成 - {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             }
@@ -515,11 +540,11 @@ namespace WinTriage
                 }
 
                 File.WriteAllText(hashFile, sb.ToString(), Encoding.UTF8);
-                AppendLog("哈希清单已生成 (hash_list.txt)", Color.Lime);
+                AppendLog("哈希清单已生成 (hash_list.txt)", Theme.AccentGreen);
             }
             catch (Exception ex)
             {
-                AppendLog($"哈希生成警告: {ex.Message}", Color.Gold);
+                AppendLog($"哈希生成警告: {ex.Message}", Theme.AccentOrange);
                 WriteAuditLog($"哈希生成警告: {ex.Message}");
             }
         }
